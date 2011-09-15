@@ -17,31 +17,101 @@ var App = {
 window.App = App;
 
 App.Message = Backbone.Model.extend({
-  urlRoot: "/messages"
+  urlRoot: "/messages",
+  
+  defaults: {
+    selected: false,
+    selectionRequested: false
+  },
+  
+  reset: function() {
+    this.set({
+      selected: false
+    });
+  },
+  
+  toggleSelected: function() {
+    var newSelectedState = !this.get('selected');
+    this.set({
+      selected: newSelectedState
+    });
+    return newSelectedState;
+  },
+  
+  toggleSelectionRequested: function() {
+    var newSelectionRequestedState = !this.get('selectionRequested');
+    this.set({
+      selectionRequested: newSelectionRequestedState
+    });
+    return newSelectionRequestedState;
+  },
+  
+  isSelected: function() {
+    return this.get('selected');
+  },
+  
+  selectionHasBeenRequested: function() {
+    return this.get('selectionRequested');
+  }
 });
 
 App.Messages = Backbone.Collection.extend({
   model: App.Message,
-  url: "/messages"
+  url: "/messages",
+  selectedMessageID: null,
+  handlingSelectionRequest: false,
+
+  initialize: function() {
+    _.bindAll(this, "handleSelectionRequest");
+    this.bind("change:selectionRequested", this.handleSelectionRequest);
+  },
+  
+  handleSelectionRequest: function() {
+    if (!this.handlingSelectionRequest) {
+      this.handlingSelectionRequest = true;
+      
+      var selectionRequests = this.select(function(message) { return message.selectionHasBeenRequested(); });
+
+      var i = 0;
+      for (i = 0; i < selectionRequests.length; i++) {
+        var message = selectionRequests[i];
+        
+        if (this.selectedMessageID !== message.id) {
+          if (this.selectedMessageID !== null) {
+            this.get(this.selectedMessageID).toggleSelected();
+          }
+          
+          message.toggleSelected();
+          this.selectedMessageID = message.id;
+        }
+
+        message.toggleSelectionRequested();        
+        
+        break;
+      }
+      
+      this.handlingSelectionRequest = false;
+    }
+  }
 });
 
 App.MessageView = Backbone.View.extend({
   tagName: "li",
   className: "inbox_message",
   template: _.template("<header><%= subject %><button class='remove'>x</button></header><p><%= body %></p>"),
+  templateSelected: _.template("<header class='selected'><%= subject %><button class='remove'>x</button></header><p><%= body %></p>"),
 
   events: {
-    "click": "select",
+    "click": "requestSelection",
     "click button.remove": "destroy"
   },
 
   initialize: function(){
-    _.bindAll(this, "remove");
+    _.bindAll(this, "destroy",
+                    "render");
     this.model.bind("remove", this.remove);
-  },
-
-  select: function(){
-    window.location.hash = "messages/" + this.model.id
+    this.model.bind("change:selected", this.render)
+    this.messages = this.collection;
   },
 
   destroy: function(){
@@ -49,7 +119,18 @@ App.MessageView = Backbone.View.extend({
   },
 
   render: function(){
-    $(this.el).html(this.template(this.model.toJSON()));
+    if (this.model.isSelected())
+      $(this.el).html(this.templateSelected(this.model.toJSON()));
+    else
+      $(this.el).html(this.template(this.model.toJSON()));
+    return this;
+  },
+
+  requestSelection: function(){
+    if (this.model.toggleSelectionRequested())
+      window.location.hash = "messages/" + this.model.id;
+    else
+      window.location.hash = "";
     return this;
   }
 });
@@ -57,10 +138,16 @@ App.MessageView = Backbone.View.extend({
 App.InboxView = Backbone.View.extend({
   tagName: "ul",
   className: "inbox",
+  
   initialize: function(){
-    _.bindAll(this, "renderMessage", "renderAllMessages");
+    _.bindAll(this, "renderMessage",
+                    "renderAllMessages");
     this.collection.bind("add", this.renderMessage);
     this.collection.bind("reset", this.renderAllMessages);
+  },
+  
+  reset: function() {
+    this.collection.reset();
   },
 
   renderMessage: function(message) {
@@ -70,8 +157,13 @@ App.InboxView = Backbone.View.extend({
 
   renderAllMessages: function(messages) {
     messages.each(this.renderMessage);
-  },
-
+    // if (!this.once) {
+    //           console.log(this.collection.size());
+    //           this.collection.at(0).toggleSelected();
+    //           this.collection.at(1).toggleSelected();
+    //           this.once = false;
+    //     }
+  }
 });
 
 App.MessageDetailView = Backbone.View.extend({
