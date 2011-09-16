@@ -64,6 +64,7 @@ App.Messages = Backbone.Collection.extend({
   initialize: function() {
     _.bindAll(this, "handleSelectionRequest");
     this.bind("change:selectionRequested", this.handleSelectionRequest);
+    this.bind("remove", this.handleRemoval);
   },
   
   handleSelectionRequest: function() {
@@ -92,6 +93,12 @@ App.Messages = Backbone.Collection.extend({
       
       this.handlingSelectionRequest = false;
     }
+  },
+  
+  handleRemoval: function() {
+    if (this.get(this.selectedMessageID) == undefined){
+      this.selectedMessageID = null;
+    }
   }
 });
 
@@ -103,19 +110,20 @@ App.MessageView = Backbone.View.extend({
 
   events: {
     "click": "requestSelection",
-    "click button.remove": "destroy",
+    "click button.remove": "remove",
   },
 
   initialize: function(){
-    _.bindAll(this, "destroy",
+    _.bindAll(this, "remove",
                     "render");
-    this.model.bind("remove", this.remove);
-    this.model.bind("change:selected", this.render)
+    this.model.bind("change:selected", this.render);
     this.messages = this.collection;
   },
 
-  destroy: function(){
+  remove: function(){
     this.model.destroy();
+    $(this.el).remove();
+    window.location.hash = "";
   },
 
   render: function(){
@@ -190,32 +198,44 @@ App.InboxView = Backbone.View.extend({
 });
 
 App.MessageDetailView = Backbone.View.extend({
-  tagName: "article",
+  tagName: "p",
   className: "message",
+  template: _.template("<header><%= subject %></header><p><%= body %></p>"),
 
   initialize: function() {
     _.bindAll(this, "render");
+    this.model.bind("destroy", this.remove);
   },
 
-  template: _.template("<header><%= subject %></header><p><%= body %></p>"),
-  render: function(){
+  render: function() {
     $(this.el).html(this.template(this.model.toJSON()));
     return this;
+  },
+  
+  remove: function() {
+    console.log("hey!");
+    $(this.el).remove();
   }
 });
 
 App.MessagesRouter = Backbone.Router.extend({
   routes: {
+    "": "reset",
     "messages/:id": "showMessage"
+  },
+  
+  reset: function() {
+    $("#detail").html("");
   },
 
   showMessage: function(id) {
     var message = new App.Message({id: id});
     message.fetch({
-      success: function(model, response) {
-        var messageDetailView = new App.MessageDetailView({model: model});
+      success: function(message, response) {
+        var messageDetailView = new App.MessageDetailView({model: message});
         $("#detail").html(messageDetailView.render().el);
       },
+      
       failure: function(model, response) {
         console.log("Teh Fail");
       }
