@@ -103,7 +103,7 @@ App.MessageView = Backbone.View.extend({
 
   events: {
     "click": "requestSelection",
-    "click button.remove": "destroy"
+    "click button.remove": "destroy",
   },
 
   initialize: function(){
@@ -135,6 +135,35 @@ App.MessageView = Backbone.View.extend({
   }
 });
 
+App.MessageComposerView = Backbone.View.extend({
+  tagName: "header",
+  className: "message_composer",
+  
+  events: {
+    "click button.add": "addMessage"
+  },
+  
+  initialize: function() {
+    _.bindAll(this, "render");
+    this.collection.bind("reset", this.render);
+    this.messages = this.collection;
+  },
+  
+  render: function() {
+    $(this.el).html('Subject: <input type="text" name="subject" id="subject-box" /> Body: <input type="text" name="body" id="body-box" /><button class="add">Add</button>');
+    return this;
+  },
+  
+  addMessage: function() {
+    var subject = $("#subject-box").val();
+    var body = $("#body-box").val();
+    var message = new App.Message({"subject": subject, "body": body});
+    message.save();
+    this.messages.add(message);
+    return this;
+  }
+});
+
 App.InboxView = Backbone.View.extend({
   tagName: "ul",
   className: "inbox",
@@ -157,12 +186,6 @@ App.InboxView = Backbone.View.extend({
 
   renderAllMessages: function(messages) {
     messages.each(this.renderMessage);
-    // if (!this.once) {
-    //           console.log(this.collection.size());
-    //           this.collection.at(0).toggleSelected();
-    //           this.collection.at(1).toggleSelected();
-    //           this.once = false;
-    //     }
   }
 });
 
@@ -203,7 +226,9 @@ App.MessagesRouter = Backbone.Router.extend({
 $(function(){
   var messages = new App.Messages();
   window.inbox    = new App.InboxView({collection: messages});
+  window.messageComposer = new App.MessageComposerView({collection: messages});
 
+  $("nav").html(messageComposer.el);
   $("aside").html(inbox.el);
   messages.fetch();
 
