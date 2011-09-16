@@ -218,25 +218,46 @@ App.MessageDetailView = Backbone.View.extend({
   }
 });
 
+var State = {
+  listView: null,
+  listVisible: true
+};
+
 App.MessagesRouter = Backbone.Router.extend({
   routes: {
-    "": "reset",
-    "messages/:id": "showMessage"
+    "messages": "index",
+    "messages/:id": "show"
   },
-  
-  reset: function() {
-    $("#detail").html("");
+
+  index: function(){
+    this.loadMessages();
+  },
+
+  show: function(id) {
+    if (State.listView !== "messages") {
+      this.loadMessages();
+    }
+    this.showMessage(id);
+  },
+
+  loadMessages: function(){
+    var messages = new App.Messages();
+    window.inbox    = new App.InboxView({collection: messages});
+
+    $("aside").html(inbox.el);
+    State.listView = "messages";
+    messages.fetch();
   },
 
   showMessage: function(id) {
+
     var message = new App.Message({id: id});
     message.fetch({
-      success: function(message, response) {
-        var messageDetailView = new App.MessageDetailView({model: message});
+      success: function(model, response) {
+        var messageDetailView = new App.MessageDetailView({model: model});
         $("#detail").html(messageDetailView.render().el);
       },
-      
-      failure: function(model, response) {
+      error: function(model, response) {
         console.log("Teh Fail");
       }
     });
@@ -244,14 +265,6 @@ App.MessagesRouter = Backbone.Router.extend({
 });
 
 $(function(){
-  var messages = new App.Messages();
-  window.inbox    = new App.InboxView({collection: messages});
-  window.messageComposer = new App.MessageComposerView({collection: messages});
-
-  $("nav").html(messageComposer.el);
-  $("aside").html(inbox.el);
-  messages.fetch();
-
   new App.MessagesRouter();
   Backbone.history.start();
 });
